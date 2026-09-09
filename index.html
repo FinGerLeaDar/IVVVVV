@@ -3,58 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>US Stock & Options Defense Radar (GitHub Synced)</title>
+    <title>US Stock Professional Analysis Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- 引入 Google Gen AI SDK (Browser version via esm) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.run/@google/genai"
+        }
+      }
+    </script>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8">
 
-    <div class="max-w-7xl mx-auto space-y-6">
-        <!-- 頂部標題與 GitHub 設定區 -->
+    <div class="max-w-6xl mx-auto space-y-6">
+        <!-- 頂部標題與設定 -->
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 gap-4">
             <div>
-                <h1 class="text-2xl font-bold tracking-wider text-cyan-400">🛡️ US Stock & Options Defense Radar</h1>
-                <p class="text-xs text-slate-400 mt-1">連動 GitHub Repo 實時同步監控清單 (API Sync)</p>
+                <h1 class="text-2xl font-bold tracking-wider text-cyan-400">🛡️ US Stock Interactive Radar</h1>
+                <p class="text-xs text-slate-400 mt-1">純網頁自選管理 + 即時 AI 專業交叉分析 (Cross-Reference)</p>
             </div>
-            <div class="flex items-center gap-2 w-full md:w-auto">
-                <button onclick="configToken()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded border border-slate-700 transition cursor-pointer">⚙️ 設定 GitHub Token</button>
-                <input type="text" id="newTicker" placeholder="代號 (例: AAPL)" class="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded text-sm uppercase w-28 focus:outline-none focus:border-cyan-500">
-                <button onclick="addStockToGitHub()" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold px-4 py-1.5 rounded text-sm transition cursor-pointer">新增並同步</button>
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="configAPIKey()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded border border-slate-700 cursor-pointer">🔑 設定 Gemini Key</button>
+                <button onclick="configGitHubToken()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded border border-slate-700 cursor-pointer">⚙️ GitHub Token</button>
+                <input type="text" id="newTicker" placeholder="代號 (例: ONDS)" class="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded text-sm uppercase w-24 focus:outline-none focus:border-cyan-500">
+                <button onclick="addStock()" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold px-4 py-1.5 rounded text-sm cursor-pointer">新增</button>
             </div>
         </header>
 
-        <!-- 內容主體 -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- 左側清單 -->
+        <!-- 主體版面 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左側：清單 -->
             <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
                 <div>
-                    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">📌 GitHub 監控清單</h2>
+                    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">📌 監控清單 (Sync with GitHub)</h2>
                     <div id="stockList" class="space-y-2">
-                        <!-- 動態載入 -->
-                        <div class="text-xs text-slate-500 text-center py-4">正在從 GitHub 同步資料...</div>
+                        <div class="text-xs text-slate-500 text-center py-4">載入中...</div>
                     </div>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-500">
+                    💡 點擊股票即可選定目標，按右側按鈕即時呼叫 AI 進行深度拆解。
                 </div>
             </div>
 
-            <!-- 右側詳情面板 -->
+            <!-- 右側：分析控制台 -->
             <div class="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
-                <div class="flex justify-between items-start">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-4">
                     <div>
                         <span id="activeTickerBadge" class="bg-cyan-500/10 text-cyan-400 text-xs font-semibold px-2.5 py-1 rounded border border-cyan-500/20">--</span>
-                        <h2 id="activeStockName" class="text-xl font-bold mt-2">請選擇股票</h2>
+                        <h2 id="activeStockTitle" class="text-xl font-bold mt-1">請選擇股票</h2>
                     </div>
-                    <div class="text-right">
-                        <div id="activePrice" class="text-2xl font-mono font-bold">--</div>
-                    </div>
+                    <button onclick="runProfessionalAnalysis()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold px-5 py-2 rounded text-sm transition cursor-pointer flex items-center gap-1.5 shadow-lg">
+                        ⚡ 一鍵進行專業交叉分析
+                    </button>
                 </div>
-                <div class="text-xs text-slate-400">
-                    💡 提示：所有在網頁新增或刪除的操作，都會透過 GitHub API 即時寫入 `stocks.json`，GitHub Actions 會自動跟隨最新清單執行。
+
+                <!-- 分析結果展示區 -->
+                <div id="analysisResultArea" class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 min-h-[300px] font-mono text-xs leading-relaxed text-slate-300 space-y-3">
+                    <div class="text-slate-500 text-center py-20">請先點擊上方按鈕，即時產出 Professional Analysis Report。</div>
                 </div>
             </div>
-        </section>
+        </div>
     </div>
 
-    <script>
-        // 👉 填入你自己的 GitHub 設定
+    <script type="module">
+        import { GoogleGenAI } from "@google/genai";
+
+        // 👉 填入你自己的 GitHub Repo 資訊
         const GH_OWNER = "你的GitHub用戶名";
         const GH_REPO = "你的Repo名稱";
         const GH_FILE_PATH = "stocks.json";
@@ -62,132 +77,137 @@
         let stocks = [];
         let currentActive = "";
 
-        // 取得 Token (存在 LocalStorage 確保安全)
-        function getToken() {
-            return localStorage.getItem("gh_pat_token") || "";
+        window.configAPIKey = function() {
+            const key = prompt("請輸入你的 Google Gemini API Key:", localStorage.getItem("gemini_api_key") || "");
+            if (key !== null) {
+                localStorage.setItem("gemini_api_key", key.trim());
+                alert("Gemini API Key 已儲存！");
+            }
         }
 
-        function configToken() {
-            const token = prompt("請輸入你的 GitHub Personal Access Token (需有 repo 權限):", getToken());
+        window.configGitHubToken = function() {
+            const token = prompt("請輸入 GitHub Personal Token (用於同步 stocks.json):", localStorage.getItem("gh_pat_token") || "");
             if (token !== null) {
                 localStorage.setItem("gh_pat_token", token.trim());
-                alert("Token 已儲存於瀏覽器 LocalStorage！");
+                alert("GitHub Token 已儲存！");
                 loadGitHubStocks();
             }
         }
 
-        // 從 GitHub 讀取 stocks.json
-        async fn loadGitHubStocks() {
-            const token = getToken();
+        function getGitHubToken() { return localStorage.getItem("gh_pat_token") || ""; }
+        function getGeminiKey() { return localStorage.getItem("gemini_api_key") || ""; }
+
+        // 讀取 GitHub stocks.json
+        async function loadGitHubStocks() {
+            const token = getGitHubToken();
             const headers = token ? { "Authorization": `token ${token}` } : {};
-            
             try {
                 const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}`, { headers });
-                if (!res.ok) throw new Error("無法讀取 GitHub 檔案，請檢查 Repo 設定或 Token。");
+                if (!res.ok) throw new Error("無法讀取 GitHub 檔案");
                 const data = await res.json();
-                
-                // Base64 解碼內容
-                const content = JSON.parse(atob(data.content));
-                stocks = content;
+                stocks = JSON.parse(atob(data.content));
                 if (stocks.length > 0 && !currentActive) currentActive = stocks[0];
                 renderList();
             } catch (err) {
-                console.error(err);
-                document.getElementById("stockList").innerHTML = `<div class="text-xs text-rose-400 p-2">載入失敗：${err.message}<br>請先點右上角設定 Token。</div>`;
+                document.getElementById("stockList").innerHTML = `<div class="text-xs text-rose-400 p-2">載入失敗：${err.message}<br>請先設定 GitHub Token。</div>`;
             }
         }
 
-        // 更新 GitHub 上的 stocks.json
-        async fn updateGitHubStocks(newStocksList) {
-            const token = getToken();
-            if (!token) {
-                alert("請先設定 GitHub Token 先可以寫入資料！");
-                configToken();
-                return;
-            }
-
-            const headers = {
-                "Authorization": `token ${token}`,
-                "Content-Type": "application/json"
-            };
-
+        // 更新 GitHub stocks.json
+        async function updateGitHubStocks(newList) {
+            const token = getGitHubToken();
+            if (!token) { alert("請先設定 GitHub Token！"); configGitHubToken(); return; }
+            const headers = { "Authorization": `token ${token}`, "Content-Type": "application/json" };
             try {
-                // 1. 先拎一次拎現有檔案嘅 SHA (GitHub API 更新檔案必須)
                 const getRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}`, { headers });
                 const fileData = await getRes.json();
-                const sha = fileData.sha;
-
-                // 2. 將新清單轉成 Base64
-                const updatedContent = btoa(JSON.stringify(newStocksList, null, 2));
-
-                // 3. 發送 PUT 請求寫入 GitHub
+                
                 const putRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}`, {
                     method: "PUT",
                     headers: headers,
                     body: JSON.stringify({
-                        message: `Update stock watchlist via web UI [skip ci]`,
-                        content: updatedContent,
-                        sha: sha
+                        message: `Update watchlist via web UI`,
+                        content: btoa(JSON.stringify(newList, null, 2)),
+                        sha: fileData.sha
                     })
                 });
-
-                if (!putRes.ok) throw new Error("寫入 GitHub 失敗，Token 權限可能不足。");
-
-                alert("成功同步寫入 GitHub Repo！");
-                stocks = newStocksList;
+                if (!putRes.ok) throw new Error("寫入 GitHub 失敗");
+                stocks = newList;
                 renderList();
             } catch (err) {
                 alert(`同步失敗：${err.message}`);
             }
         }
 
-        function renderList() {
+        window.renderList = function() {
             const listEl = document.getElementById("stockList");
             listEl.innerHTML = "";
-            if (stocks.length === 0) {
-                listEl.innerHTML = `<div class="text-xs text-slate-500">暫無監控股票</div>`;
-                return;
-            }
+            if (stocks.length === 0) { listEl.innerHTML = `<div class="text-xs text-slate-500">暫無監控股票</div>`; return; }
             stocks.forEach(ticker => {
                 const isSelected = ticker === currentActive;
                 const div = document.createElement("div");
                 div.className = `flex justify-between items-center p-3 rounded-lg border transition cursor-pointer ${isSelected ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300' : 'bg-slate-950/40 border-slate-800/60 hover:bg-slate-800/50 text-slate-300'}`;
                 div.innerHTML = `
-                    <div onclick="currentActive='${ticker}'; renderList();" class="flex-1 font-bold font-mono">${ticker}</div>
-                    <button onclick="removeStock('${ticker}')" class="text-slate-500 hover:text-rose-400 text-xs px-2">✕</button>
+                    <div onclick="window.selectStock('${ticker}')" class="flex-1 font-bold font-mono">${ticker}</div>
+                    <button onclick="window.removeStock('${ticker}')" class="text-slate-500 hover:text-rose-400 text-xs px-2">✕</button>
                 `;
                 listEl.appendChild(div);
             });
             if (currentActive) {
                 document.getElementById("activeTickerBadge").innerText = currentActive;
-                document.getElementById("activeStockName").innerText = `${currentActive} Stock Radar`;
+                document.getElementById("activeStockTitle").innerText = `${currentActive} 深度財經偵察`;
             }
         }
 
-        async fn addStockToGitHub() {
+        window.selectStock = function(ticker) {
+            currentActive = ticker;
+            window.renderList();
+        }
+
+        window.addStock = async function() {
             const input = document.getElementById("newTicker");
             const ticker = input.value.trim().toUpperCase();
             if (!ticker) return;
-            if (stocks.includes(ticker)) {
-                alert("呢隻股票已經在清單中！");
-                return;
-            }
-            const newList = [...stocks, ticker];
-            await updateGitHubStocks(newList);
+            if (stocks.includes(ticker)) { alert("已經在清單中！"); return; }
+            await updateGitHubStocks([...stocks, ticker]);
             input.value = "";
             currentActive = ticker;
         }
 
-        async fn removeStock(ticker) {
-            if (!confirm(`確定要從清單移除 ${ticker} 嗎？`)) return;
+        window.removeStock = async function(ticker) {
+            if (!confirm(`確定移除 ${ticker}？`)) return;
             const newList = stocks.filter(s => s !== ticker);
             await updateGitHubStocks(newList);
-            if (currentActive === ticker) {
-                currentActive = newList.length > 0 ? newList[0] : "";
+            if (currentActive === ticker) currentActive = newList[0] || "";
+        }
+
+        // 一鍵專業分析 (前端直接呼叫 Gemini SDK)
+        window.runProfessionalAnalysis = async function() {
+            const apiKey = getGeminiKey();
+            if (!apiKey) { alert("請先設定 Gemini API Key！"); configAPIKey(); return; }
+            if (!currentActive) { alert("請先選擇一隻股票！"); return; }
+
+            const resultArea = document.getElementById("analysisResultArea");
+            resultArea.innerHTML = `<div class="text-cyan-400 animate-pulse py-10 text-center">⏳ 正在連線調用 Gemini 進行 Professional Cross-Reference 分析，請稍候...</div>`;
+
+            try {
+                const ai = new GoogleGenAI({ apiKey: apiKey });
+                const prompt = `請針對美股 ${currentActive} 目前嘅市場動向、估值、以及期權/基本面進行深度專業交叉分析 (Professional Cross-Reference Analysis)。請用專業且結構化嘅格式回覆，包含：
+                1. 核心財經與基本面審視
+                2. Good vs Bad Action 剖析 (Why Yes / No)
+                3. 當前引伸波幅 (IV) 狀況與期權策略（如 CSP / Credit Spread）建議。`;
+
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: prompt,
+                });
+
+                resultArea.innerHTML = `<div class="whitespace-pre-wrap">${response.text}</div>`;
+            } catch (err) {
+                resultArea.innerHTML = `<div class="text-rose-400">分析失敗：${err.message}</div>`;
             }
         }
 
-        // 初始化加載
         loadGitHubStocks();
     </script>
 </body>
