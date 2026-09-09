@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>US Stock & Options Defense Radar (GitHub Synced)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- 頂部標題與 GitHub 設定區 -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold tracking-wider text-cyan-400">🛡️ US Stock & Options Defense Radar</h1>
+                <p class="text-xs text-slate-400 mt-1">連動 GitHub Repo 實時同步監控清單 (API Sync)</p>
+            </div>
+            <div class="flex items-center gap-2 w-full md:w-auto">
+                <button onclick="configToken()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded border border-slate-700 transition cursor-pointer">⚙️ 設定 GitHub Token</button>
+                <input type="text" id="newTicker" placeholder="代號 (例: AAPL)" class="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded text-sm uppercase w-28 focus:outline-none focus:border-cyan-500">
+                <button onclick="addStockToGitHub()" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold px-4 py-1.5 rounded text-sm transition cursor-pointer">新增並同步</button>
+            </div>
+        </header>
+
+        <!-- 內容主體 -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左側清單 -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">📌 GitHub 監控清單</h2>
+                    <div id="stockList" class="space-y-2">
+                        <!-- 動態載入 -->
+                        <div class="text-xs text-slate-500 text-center py-4">正在從 GitHub 同步資料...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側詳情面板 -->
+            <div class="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span id="activeTickerBadge" class="bg-cyan-500/10 text-cyan-400 text-xs font-semibold px-2.5 py-1 rounded border border-cyan-500/20">--</span>
+                        <h2 id="activeStockName" class="text-xl font-bold mt-2">請選擇股票</h2>
+                    </div>
+                    <div class="text-right">
+                        <div id="activePrice" class="text-2xl font-mono font-bold">--</div>
+                    </div>
+                </div>
+                <div class="text-xs text-slate-400">
+                    💡 提示：所有在網頁新增或刪除的操作，都會透過 GitHub API 即時寫入 `stocks.json`，GitHub Actions 會自動跟隨最新清單執行。
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // 👉 填入你自己的 GitHub 設定
+        const GH_OWNER = "你的GitHub用戶名";
+        const GH_REPO = "你的Repo名稱";
+        const GH_FILE_PATH = "stocks.json";
+
+        let stocks = [];
+        let currentActive = "";
+
+        // 取得 Token (存在 LocalStorage 確保安全)
+        function getToken() {
+            return localStorage.getItem("gh_pat_token") || "";
+        }
+
+        function configToken() {
+            const token = prompt("請輸入你的 GitHub Personal Access Token (需有 repo 權限):", getToken());
+            if (token !== null) {
+                localStorage.setItem("gh_pat_token", token.trim());
+                alert("Token 已儲存於瀏覽器 LocalStorage！");
+                loadGitHubStocks();
+            }
+        }
+
+        // 從 GitHub 讀取 stocks.json
+        async fn loadGitHubStocks() {
+            const token = getToken();
+            const headers = token ? { "Authorization": `token ${token}` } : {};
+            
+            try {
+                const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}`, { headers });
+                if (!res.ok) throw new Error("無法讀取 GitHub 檔案，請檢查 Repo 設定或 Token。");
+                const data = await res.json();
+                
+                // Base64 解碼內容
+                const content = JSON.parse(atob(data.content));
+                stocks = content;
+                if (stocks.length > 0 && !currentActive) currentActive = stocks[0];
+                renderList();
+            } catch (err) {
+                console.error(err);
+                document.getElementById("stockList").innerHTML = `<div class="text-xs text-rose-400 p-2">載入失敗：${err.message}<br>請先點右上角設定 Token。</div>`;
+            }
+        }
+
+        // 更新 GitHub 上的 stocks.json
+        async fn updateGitHubStocks(newStocksList) {
+            const token = getToken();
+            if (!token) {
+                alert("請先設定 GitHub Token 先可以寫入資料！");
+                configToken();
+                return;
+            }
+
+            const headers = {
+                "Authorization": `token ${token}`,
+                "Content-Type": "application/json"
+            };
+
+            try {
+                // 1. 先拎一次拎現有檔案嘅 SHA (GitHub API 更新檔案必須)
+                const getRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}`, { headers });
+                const fileData = await getRes.json();
+                const sha = fileData.sha;
+
+                // 2. 將新清單轉成 Base64
+                const updatedContent = btoa(JSON.stringify(newStocksList, null, 2));
+
+                // 3. 發送 PUT 請求寫入 GitHub
+                const putRes = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_FILE_PATH}`, {
+                    method: "PUT",
+                    headers: headers,
+                    body: JSON.stringify({
+                        message: `Update stock watchlist via web UI [skip ci]`,
+                        content: updatedContent,
+                        sha: sha
+                    })
+                });
+
+                if (!putRes.ok) throw new Error("寫入 GitHub 失敗，Token 權限可能不足。");
+
+                alert("成功同步寫入 GitHub Repo！");
+                stocks = newStocksList;
+                renderList();
+            } catch (err) {
+                alert(`同步失敗：${err.message}`);
+            }
+        }
+
+        function renderList() {
+            const listEl = document.getElementById("stockList");
+            listEl.innerHTML = "";
+            if (stocks.length === 0) {
+                listEl.innerHTML = `<div class="text-xs text-slate-500">暫無監控股票</div>`;
+                return;
+            }
+            stocks.forEach(ticker => {
+                const isSelected = ticker === currentActive;
+                const div = document.createElement("div");
+                div.className = `flex justify-between items-center p-3 rounded-lg border transition cursor-pointer ${isSelected ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300' : 'bg-slate-950/40 border-slate-800/60 hover:bg-slate-800/50 text-slate-300'}`;
+                div.innerHTML = `
+                    <div onclick="currentActive='${ticker}'; renderList();" class="flex-1 font-bold font-mono">${ticker}</div>
+                    <button onclick="removeStock('${ticker}')" class="text-slate-500 hover:text-rose-400 text-xs px-2">✕</button>
+                `;
+                listEl.appendChild(div);
+            });
+            if (currentActive) {
+                document.getElementById("activeTickerBadge").innerText = currentActive;
+                document.getElementById("activeStockName").innerText = `${currentActive} Stock Radar`;
+            }
+        }
+
+        async fn addStockToGitHub() {
+            const input = document.getElementById("newTicker");
+            const ticker = input.value.trim().toUpperCase();
+            if (!ticker) return;
+            if (stocks.includes(ticker)) {
+                alert("呢隻股票已經在清單中！");
+                return;
+            }
+            const newList = [...stocks, ticker];
+            await updateGitHubStocks(newList);
+            input.value = "";
+            currentActive = ticker;
+        }
+
+        async fn removeStock(ticker) {
+            if (!confirm(`確定要從清單移除 ${ticker} 嗎？`)) return;
+            const newList = stocks.filter(s => s !== ticker);
+            await updateGitHubStocks(newList);
+            if (currentActive === ticker) {
+                currentActive = newList.length > 0 ? newList[0] : "";
+            }
+        }
+
+        // 初始化加載
+        loadGitHubStocks();
+    </script>
+</body>
+</html>
