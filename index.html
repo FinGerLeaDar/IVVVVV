@@ -69,9 +69,9 @@
     <script type="module">
         import { GoogleGenAI } from "@google/genai";
 
-        // 👉 填入你自己的 GitHub Repo 資訊
-        const GH_OWNER = "你的GitHub用戶名";
-        const GH_REPO = "你的Repo名稱";
+        // 👉 自動對應你個 GitHub Repo
+        const GH_OWNER = "FinGerLeaDar";
+        const GH_REPO = "IVVVVV";
         const GH_FILE_PATH = "stocks.json";
 
         let stocks = [];
@@ -109,7 +109,7 @@
                 if (stocks.length > 0 && !currentActive) currentActive = stocks[0];
                 renderList();
             } catch (err) {
-                document.getElementById("stockList").innerHTML = `<div class="text-xs text-rose-400 p-2">載入失敗：${err.message}<br>請先設定 GitHub Token。</div>`;
+                document.getElementById("stockList").innerHTML = `<div class="text-xs text-rose-400 p-2">載入失敗：${err.message}<br>請先點右上角設定 GitHub Token。</div>`;
             }
         }
 
